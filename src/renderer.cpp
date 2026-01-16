@@ -1,4 +1,4 @@
-#include <hyprland/src/desktop/Window.hpp>
+#include <hyprland/src/desktop/view/Window.hpp>
 
 #include <cairo/cairo.h>
 #include <pango/pangocairo.h>
