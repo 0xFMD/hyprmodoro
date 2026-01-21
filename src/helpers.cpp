@@ -3,6 +3,7 @@
 #include <hyprland/src/managers/animation/AnimationManager.hpp>
 #include <hyprland/src/config/ConfigManager.hpp>
 #include <hyprland/src/Compositor.hpp>
+#include <hyprland/src/desktop/state/FocusState.hpp>
 
 #include "hyprmodoroDecoration.hpp"
 
@@ -58,16 +59,16 @@ bool HyprmodoroDecoration::isValidInput() {
     const auto PWINDOW = m_pWindow.lock();
 
     if (!m_pWindow->m_workspace || !validMapped(m_pWindow) || !m_pWindow->m_workspace->isVisible() || !g_pInputManager->m_exclusiveLSes.empty() ||
-        (g_pSeatManager->m_seatGrab && !g_pSeatManager->m_seatGrab->accepts(m_pWindow->m_wlSurface->resource())))
+        (g_pSeatManager->m_seatGrab && !g_pSeatManager->m_seatGrab->accepts(m_pWindow->wlSurface()->resource())))
         return false;
 
-    const auto WINDOWATCURSOR = g_pCompositor->vectorToWindowUnified(g_pInputManager->getMouseCoordsInternal(), RESERVED_EXTENTS | INPUT_EXTENTS | ALLOW_FLOATING);
+    const auto WINDOWATCURSOR = g_pCompositor->vectorToWindowUnified(g_pInputManager->getMouseCoordsInternal(), Desktop::View::RESERVED_EXTENTS | Desktop::View::INPUT_EXTENTS | Desktop::View::ALLOW_FLOATING);
 
-    if (WINDOWATCURSOR != PWINDOW && PWINDOW != g_pCompositor->m_lastWindow.lock())
+    if (WINDOWATCURSOR != PWINDOW && PWINDOW != Desktop::focusState()->window())
         return false;
 
     // Check if input is on top or overlay shell layers
-    auto     PMONITOR     = g_pCompositor->m_lastMonitor.lock();
+    auto     PMONITOR     = Desktop::focusState()->monitor();
     PHLLS    foundSurface = nullptr;
     Vector2D surfaceCoords;
 
