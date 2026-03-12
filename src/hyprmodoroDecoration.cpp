@@ -3,7 +3,6 @@
 #include <hyprland/src/render/Renderer.hpp>
 #include <hyprland/src/managers/animation/AnimationManager.hpp>
 #include <hyprland/src/config/ConfigManager.hpp>
-
 #include "hyprmodoroDecoration.hpp"
 #include "HyprmodoroPassElement.hpp"
 #include "pomodoro.hpp"
@@ -13,15 +12,13 @@ HyprmodoroDecoration::HyprmodoroDecoration(PHLWINDOW pWindow) : IHyprWindowDecor
     m_pProgressTex = makeShared<CTexture>();
     setupButtons();
 
-    m_pMouseButtonCallback = HyprlandAPI::registerCallbackDynamic(
-        PHANDLE, "mouseButton", [&](void* self, SCallbackInfo& info, std::any param) { onMouseDown(info, std::any_cast<IPointer::SButtonEvent>(param)); });
+    m_pMouseButtonCallback = Event::bus()->m_events.input.mouse.button.listen([&](IPointer::SButtonEvent e, Event::SCallbackInfo& info) { onMouseDown(info, e); });
 
     g_pAnimationManager->createAnimation(25.0f, m_hoverOffset, g_pConfigManager->getAnimationPropertyConfig("windowsMove"), AVARDAMAGE_ENTIRE);
     g_pAnimationManager->createAnimation(0.0f, m_textOpacity, g_pConfigManager->getAnimationPropertyConfig("fadeOut"), AVARDAMAGE_ENTIRE);
 }
 
 HyprmodoroDecoration::~HyprmodoroDecoration() {
-    m_pMouseButtonCallback = nullptr;
     m_vButtons.clear();
     std::erase(g_pGlobalState->decorations, m_self);
 }
@@ -79,16 +76,20 @@ SDecorationPositioningInfo HyprmodoroDecoration::getPositioningInfo() {
         yOffset = windowPadding;
     }
 
+    m_reservedYOffset = yOffset;
+
     info.desiredExtents = {{0.0, yOffset}, {0, 0}};
     return info;
 }
 
 void HyprmodoroDecoration::onPositioningReply(const SDecorationPositioningReply& reply) {
     m_bAssignedGeometry = reply.assignedGeometry;
+    m_bAssignedGeometry.y += m_reservedYOffset;
+    m_bAssignedGeometry.height -= m_reservedYOffset;
 }
 
 uint64_t HyprmodoroDecoration::getDecorationFlags() {
-    return DECORATION_PART_OF_MAIN_WINDOW | DECORATION_ALLOWS_MOUSE_INPUT;
+    return DECORATION_ALLOWS_MOUSE_INPUT;
 }
 
 eDecorationLayer HyprmodoroDecoration::getDecorationLayer() {
@@ -104,6 +105,8 @@ std::string HyprmodoroDecoration::getDisplayName() {
 }
 
 CBox HyprmodoroDecoration::assignedBoxGlobal() {
+    if (!validMapped(m_pWindow))
+        return {};
 
     CBox       box     = m_bAssignedGeometry;
     const auto PWINDOW = m_pWindow.lock();
@@ -116,7 +119,7 @@ CBox HyprmodoroDecoration::assignedBoxGlobal() {
     return box.translate(WORKSPACEOFFSET);
 }
 
-void HyprmodoroDecoration::onMouseDown(SCallbackInfo& info, IPointer::SButtonEvent e) {
+void HyprmodoroDecoration::onMouseDown(Event::SCallbackInfo& info, IPointer::SButtonEvent e) {
     if (!isValidInput())
         return;
 
@@ -167,7 +170,7 @@ void HyprmodoroDecoration::draw(PHLMONITOR pMonitor, const float& a) {
 
     const auto PWINDOW = m_pWindow.lock();
 
-	if (!PWINDOW->m_ruleApplicator->decorate().valueOrDefault())
+    if (!PWINDOW->m_ruleApplicator->decorate().valueOrDefault())
         return;
 
     if (!PWINDOW->m_workspace->isVisible() || PWINDOW->isHidden())
@@ -200,14 +203,14 @@ void HyprmodoroDecoration::drawPass(PHLMONITOR pMonitor, const float& a) {
     const auto PLASTWINDOW     = Desktop::focusState()->window();
     if (**PBORDERENABLED && SESSIONPROGRESS <= 1.0f && SESSIONPROGRESS > 0.0f) {
         if (**PBORDERALLWINDOWS || PWINDOW == PLASTWINDOW) {
-            renderProgressBorder(pMonitor, a);
+            renderProgressBorder(windowBox, pMonitor, a);
         }
     }
 
     if (**PTITLEENABLED) {
 
         if ((**PTITLEALLWINDOWS && (!pMonitor->m_activeWorkspace->m_hasFullscreenWindow || PWINDOW->isFullscreen())) || PWINDOW == PLASTWINDOW) {
-            renderTitleBar(pMonitor, a);
+            renderTitleBar(windowBox, pMonitor, a);
         }
     }
     updateWindow(m_pWindow.lock());

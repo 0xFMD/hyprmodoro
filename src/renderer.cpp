@@ -6,14 +6,13 @@
 #include "hyprmodoroDecoration.hpp"
 #include "pomodoro.hpp"
 
-void HyprmodoroDecoration::renderTitleBar(PHLMONITOR pMonitor, float alpha) {
+void HyprmodoroDecoration::renderTitleBar(CBox windowBox, PHLMONITOR pMonitor, float alpha) {
     static auto* const PTITLEFLOATINGWINDOW = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprmodoro:title:floating_window")->getDataStaticPtr();
     static auto* const PMINWINDOWWIDTH      = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprmodoro:window:min_width")->getDataStaticPtr();
 
     if (!**PTITLEFLOATINGWINDOW && m_pWindow.lock()->m_isFloating)
         return;
 
-    const auto windowBox = assignedBoxGlobal();
     if (windowBox.width <= **PMINWINDOWWIDTH) // don't render for small windows
         return;
 
@@ -197,7 +196,7 @@ void HyprmodoroDecoration::renderButtons(cairo_t* cairo, const Vector2D& buffer,
     }
 }
 
-void HyprmodoroDecoration::renderProgressBorder(PHLMONITOR pMonitor, float alpha) {
+void HyprmodoroDecoration::renderProgressBorder(CBox windowBox, PHLMONITOR pMonitor, float alpha) {
     static auto* const BORDERCOLOR          = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprmodoro:border:color")->getDataStaticPtr();
     static auto* const BORDERFLOATINGWINDOW = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprmodoro:border:floating_window")->getDataStaticPtr();
     if (!**BORDERFLOATINGWINDOW && m_pWindow.lock()->m_isFloating)
@@ -205,10 +204,9 @@ void HyprmodoroDecoration::renderProgressBorder(PHLMONITOR pMonitor, float alpha
 
     const auto   SESSIONPROGRESS = g_pGlobalState->pomodoroSession->getProgress();
 
-    auto         windowBox = assignedBoxGlobal();
-    const auto   PWINDOW   = m_pWindow.lock();
-    const auto   BORDER    = PWINDOW->getRealBorderSize() * pMonitor->m_scale;
-    const auto   ROUNDING  = PWINDOW->rounding() * pMonitor->m_scale;
+    const auto   PWINDOW  = m_pWindow.lock();
+    const auto   BORDER   = PWINDOW->getRealBorderSize() * pMonitor->m_scale;
+    const auto   ROUNDING = PWINDOW->rounding() * pMonitor->m_scale;
 
     const auto   corner       = ROUNDING + BORDER;
     const float  centerBorder = BORDER * 0.5f;

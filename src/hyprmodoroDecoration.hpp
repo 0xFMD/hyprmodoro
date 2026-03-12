@@ -4,6 +4,7 @@
 
 #include <hyprland/src/render/decorations/IHyprWindowDecoration.hpp>
 #include <hyprland/src/devices/IPointer.hpp>
+#include <hyprland/src/event/EventBus.hpp>
 
 #include "HyprmodoroPassElement.hpp"
 #include "globals.hpp"
@@ -30,7 +31,7 @@ struct Button {
     PHLANIMVAR<Vector2D> position = nullptr;
 };
 
-struct Layout {
+struct TitleAreaLayout {
     CBox container;
     CBox title;
 };
@@ -56,15 +57,15 @@ class HyprmodoroDecoration : public IHyprWindowDecoration {
     CBox                           assignedBoxGlobal();
     void                           setupButtons();
     void                           drawPass(PHLMONITOR, float const& a);
-    void                           renderProgressBorder(PHLMONITOR pMonitor, float alpha);
-    void                           renderTitleBar(PHLMONITOR pMonitor, float alpha);
+    void                           renderProgressBorder(CBox windowBox, PHLMONITOR pMonitor, float alpha);
+    void                           renderTitleBar(CBox windowBox, PHLMONITOR pMonitor, float alpha);
     void                           renderButtons(cairo_t* cairo, const Vector2D& buffer, const float& scale);
     void                           renderTimer(cairo_t* cairo, const Vector2D& buffer, const float& scale);
     void                           updateHoverOffset();
     Vector2D                       cursorRelativeToContainer();
     bool                           isHoveringTitle(const CBox& windowBox, const float& scale);
     bool                           isValidInput();
-    void                           onMouseDown(SCallbackInfo& info, IPointer::SButtonEvent e);
+    void                           onMouseDown(Event::SCallbackInfo& info, IPointer::SButtonEvent e);
     void                           handleButtonClick(ButtonAction buttonAction);
 
     CBox                           m_bAssignedGeometry;
@@ -72,15 +73,15 @@ class HyprmodoroDecoration : public IHyprWindowDecoration {
     SP<CTexture>                   m_pTitleTex;
     SP<CTexture>                   m_pProgressTex;
 
-    Layout                         m_layout;
+    TitleAreaLayout                m_layout;
     std::map<ButtonAction, Button> m_vButtons;
+    float                          m_reservedYOffset = 0.0f;
 
     bool                           m_isNearContainer = false;
 
     PHLANIMVAR<float>              m_hoverOffset = nullptr;
     PHLANIMVAR<float>              m_textOpacity = nullptr;
 
-    SP<HOOK_CALLBACK_FN>           m_pMouseButtonCallback;
-
+    CHyprSignalListener            m_pMouseButtonCallback;
     friend class HyprmodoroPassElement;
 };

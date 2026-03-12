@@ -2,6 +2,7 @@
 
 #include <hyprland/src/render/Renderer.hpp>
 #include <hyprland/src/Compositor.hpp>
+#include <hyprland/src/event/EventBus.hpp>
 
 #include <string>
 
@@ -86,30 +87,22 @@ std::string getProgress(eHyprCtlOutputFormat, std::string) {
 }
 
 // handlers
-void onWindowOpen(void* self, std::any data) {
-    const auto         PWINDOW = std::any_cast<PHLWINDOW>(data);
+static void onWindowOpen(PHLWINDOW window) {
 
     static auto* const IS_HYPRMODORO_ENABLED = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprmodoro:enabled")->getDataStaticPtr();
-    if (!(**IS_HYPRMODORO_ENABLED) || PWINDOW == nullptr)
+    if (!(**IS_HYPRMODORO_ENABLED) || window == nullptr)
         return;
 
-    if (std::ranges::any_of(PWINDOW->m_windowDecorations, [](const auto& d) { return d->getDisplayName() == "hyprmodoro"; }))
+    if (std::ranges::any_of(window->m_windowDecorations, [](const auto& d) { return d->getDisplayName() == "hyprmodoro"; }))
         return;
 
-    auto decoration = makeUnique<HyprmodoroDecoration>(PWINDOW);
+    auto decoration = makeUnique<HyprmodoroDecoration>(window);
     g_pGlobalState->decorations.emplace_back(decoration);
     decoration->m_self = decoration;
-    HyprlandAPI::addWindowDecoration(PHANDLE, PWINDOW, std::move(decoration));
+    HyprlandAPI::addWindowDecoration(PHANDLE, window, std::move(decoration));
 }
 
-void onWindowClose(void* self, std::any data) {
-    if (g_pGlobalState) {
-        g_pGlobalState->decorations.erase(std::remove_if(g_pGlobalState->decorations.begin(), g_pGlobalState->decorations.end(), [](const auto& wp) { return wp.expired(); }),
-                                          g_pGlobalState->decorations.end());
-    }
-}
-
-void onConfigReload(void* self, SCallbackInfo& info, std::any data) {
+static void onConfigReload() {
     static auto* const SESSIONLENGTH = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprmodoro:work_duration")->getDataStaticPtr();
     static auto* const RESTLENGTH    = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprmodoro:rest_duration")->getDataStaticPtr();
 
@@ -125,7 +118,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     PHANDLE = handle;
 
     const std::string COMPOSITOR_HASH = __hyprland_api_get_hash();
-    const std::string CLIENT_HASH = __hyprland_api_get_client_hash();
+    const std::string CLIENT_HASH     = __hyprland_api_get_client_hash();
 
     if (COMPOSITOR_HASH != CLIENT_HASH) {
         HyprlandAPI::addNotification(PHANDLE, "[hyprmodoro] Failure in initialization: Version mismatch (headers ver is not equal to running hyprland ver)",
@@ -186,17 +179,14 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
     g_pGlobalState->pomodoroSession = makeUnique<Pomodoro>(**SESSIONLENGTH, **RESTLENGTH);
 
-    static auto configReloadCallback = HyprlandAPI::registerCallbackDynamic(PHANDLE, "configReloaded", onConfigReload);
+    static auto configReloadCallback = Event::bus()->m_events.config.reloaded.listen(onConfigReload);
 
-    static auto closeWindowCallback =
-        HyprlandAPI::registerCallbackDynamic(PHANDLE, "closeWindow", [&](void* self, SCallbackInfo& info, std::any data) { onWindowClose(self, data); });
-
-    static auto openWindowCallback = HyprlandAPI::registerCallbackDynamic(PHANDLE, "openWindow", [&](void* self, SCallbackInfo& info, std::any data) { onWindowOpen(self, data); });
+    static auto openWindowCallback = Event::bus()->m_events.window.open.listen([&](PHLWINDOW w) { onWindowOpen(w); });
 
     for (auto& window : g_pCompositor->m_windows) {
         if (window->isHidden() || !window->m_isMapped)
             continue;
-        onWindowOpen(nullptr, window);
+        onWindowOpen(window);
     }
 
     return {"hyprmodoro", "A Pomodoro timer plugin for Hyprland", "0xFMD", "0.1"};
